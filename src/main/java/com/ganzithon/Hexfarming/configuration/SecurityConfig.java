@@ -1,7 +1,7 @@
 package com.ganzithon.Hexfarming.configuration;
 
+import com.ganzithon.Hexfarming.global.GlobalConstants;
 import com.ganzithon.Hexfarming.global.filter.JwtAuthenticationFilter;
-import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -37,11 +37,7 @@ public class SecurityConfig {
                 // URL 별로 권한을 설정
                 .authorizeHttpRequests(authorize -> {
                     authorize
-                            .requestMatchers(
-                                    "/favicon.ico",
-                                    "/user/login",
-                                    "/user/signup"
-                            ).permitAll() // 위 Endpoint에 해당하는 요청은 토큰 없이도 접근 가능 + JwtAuthenticationFilter.java에서도 추가해 줘야 함
+                            .requestMatchers(GlobalConstants.noTokenNeededAPIs).permitAll() // 위 Endpoint에 해당하는 요청은 토큰 없이도 접근 가능 + JwtAuthenticationFilter.java에서도 추가해 줘야 함
                             .anyRequest().authenticated(); // 그 외 나머지 요청들은 JWT 토큰이 있어야 접근 가능
                 })
 

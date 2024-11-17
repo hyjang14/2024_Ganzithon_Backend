@@ -1,13 +1,11 @@
 package com.ganzithon.Hexfarming.domain.user;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import com.ganzithon.Hexfarming.domain.experience.Experience;
+import jakarta.persistence.*;
+import lombok.*;
+
+import java.util.ArrayList;
+import java.util.List;
 
 @Getter
 @Builder // 객체 생성을 쉽게 만들어주는 애너테이션
@@ -19,11 +17,19 @@ public class User {
     @GeneratedValue(strategy = GenerationType.IDENTITY) // 자동으로 1, 2, 3, ... 1씩 증가해서 넣어줌
     private int id;
 
-    private String username;
+    private String email;
 
     private String password;
 
     private String nickname;
 
-    private String tier;
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true) // Experience의 'user' 필드를 통해 User에서 역참조 가능
+    private List<Experience> experiences = new ArrayList<>();
+
+    public void setPassword(String password) {
+        this.password = password;
+    }
+    public void setNickname(String nickname) {
+        this.nickname = nickname;
+    }
 }
