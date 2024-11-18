@@ -2,13 +2,17 @@ package com.ganzithon.Hexfarming.domain.post;
 
 import com.ganzithon.Hexfarming.domain.comment.Comment;
 import com.ganzithon.Hexfarming.domain.experience.ExperienceService;
+import com.ganzithon.Hexfarming.domain.notification.NotificationService;
 import com.ganzithon.Hexfarming.domain.post.dto.fromClient.PostRequestDto;
 import com.ganzithon.Hexfarming.domain.post.dto.fromClient.PostUpdateRequestDto;
 import com.ganzithon.Hexfarming.domain.post.dto.fromServer.PostResponseDto;
 import com.ganzithon.Hexfarming.domain.user.User;
 import com.ganzithon.Hexfarming.domain.user.UserRepository;
+import com.ganzithon.Hexfarming.global.enumeration.Ability;
 import com.ganzithon.Hexfarming.global.utility.JwtManager;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.security.core.Authentication;
@@ -18,21 +22,27 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import com.ganzithon.Hexfarming.domain.comment.CommentRepository;
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 public class PostService {
 
     private final ExperienceService experienceService;
+    private final NotificationService notificationService;
     private final PostRepository postRepository;
     private final UserRepository userRepository;
     private final CommentRepository commentRepository;
     private final JwtManager jwtManager; // JWT 토큰 처리 클래스
 
     @Autowired
-    public PostService(ExperienceService experienceService, PostRepository postRepository, UserRepository userRepository, JwtManager jwtManager, CommentRepository commentRepository) {
+    public PostService(ExperienceService experienceService, NotificationService notificationService, PostRepository postRepository,
+                       UserRepository userRepository, JwtManager jwtManager, CommentRepository commentRepository) {
         this.experienceService = experienceService;
+        this.notificationService = notificationService;
         this.postRepository = postRepository;
         this.userRepository = userRepository;
         this.jwtManager = jwtManager;
@@ -52,10 +62,7 @@ public class PostService {
         String username = authentication.getName();
         System.out.println("인증된 사용자: " + username);
 
-        User writer = userRepository.findByEmail(username);
-        if (writer == null) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "작성자를 찾을 수 없습니다.");
-        }
+        User writer = userRepository.findByEmail(username).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "작성자를 찾을 수 없습니다."));
         System.out.println("작성자 정보: " + writer);
 
         Post post = new Post();
@@ -169,6 +176,7 @@ public class PostService {
                         int writerId = post.getWriter().getId();
                         experienceService.inceaseExperience(writerId, post.getAbility(), getAverageScoreByPostId(post.getPostId()));
                         post.setTimerOver(true);
+                        notificationService.saveCheckPoints(post);
                     });
         }
     }
@@ -200,6 +208,62 @@ public class PostService {
             System.err.println("Timer processing failed for post ID: " + post.getPostId());
             e.printStackTrace();
         }
+    }
+
+    @Transactional(readOnly = true)
+    public List<PostResponseDto> searchPost(String titleContains, Ability ability) {
+        Optional<List<Post>> postsOptional = postRepository.findByTitleContaining(titleContains);
+        if (ability != null) {
+            postsOptional = postRepository.findByTitleContainingAndAbility(titleContains, ability);
+        }
+
+        if (postsOptional.isEmpty() || postsOptional.get().isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        return postsOptional.get().stream()
+                .map(PostResponseDto::fromEntity)
+                .collect(Collectors.toList());
+    }
+
+    // 전체 카테고리: 조회수 기준 상위 2개 게시물 반환
+    @Transactional(readOnly = true)
+    public List<PostResponseDto> getTop2PostsByView() {
+        Pageable pageable = PageRequest.of(0, 2); // 0번째 페이지에서 2개만 가져오기
+        List<Post> topPosts = postRepository.findTopByOrderByViewDesc(pageable);
+        return topPosts.stream()
+                .map(PostResponseDto::fromEntity)
+                .toList();
+    }
+
+    // 카테고리별: 조회수 기준 상위 2개 게시물 반환
+    @Transactional(readOnly = true)
+    public List<PostResponseDto> getTop2PostsByCategory(Ability ability) {
+        Pageable pageable = PageRequest.of(0, 2); // 0번째 페이지에서 2개만 가져오기
+        List<Post> posts = postRepository.findTopByCategoryOrderByViewDesc(ability, pageable);
+        return posts.stream()
+                .map(PostResponseDto::fromEntity)
+                .toList();
+    }
+
+    // 전체 카테고리: 마감 임박 게시글 상위 2개 반환
+    @Transactional(readOnly = true)
+    public List<PostResponseDto> getTop2ExpiringPosts() {
+        Pageable pageable = PageRequest.of(0, 2);
+        List<Post> posts = postRepository.findTopByOrderByTimerAsc(pageable);
+        return posts.stream()
+                .map(PostResponseDto::fromEntity)
+                .toList();
+    }
+
+    // 카테고리별: 마감 임박 게시글 상위 2개 반환
+    @Transactional(readOnly = true)
+    public List<PostResponseDto> getTop2ExpiringPostsByCategory(Ability ability) {
+        Pageable pageable = PageRequest.of(0, 2); // 0번째 페이지에서 2개만 가져오기
+        List<Post> posts = postRepository.findTopByCategoryAndOrderByTimerAsc(ability, pageable);
+        return posts.stream()
+                .map(PostResponseDto::fromEntity)
+                .toList();
     }
 
 }

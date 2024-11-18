@@ -1,6 +1,7 @@
 package com.ganzithon.Hexfarming.domain.user;
 
 import com.ganzithon.Hexfarming.domain.experience.Experience;
+import com.ganzithon.Hexfarming.domain.notification.Notification;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -21,10 +22,15 @@ public class User {
 
     private String password;
 
+    private String name;
+
     private String nickname;
 
-    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true) // Experience의 'user' 필드를 통해 User에서 역참조 가능
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Experience> experiences = new ArrayList<>();
+
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Notification> notifications = new ArrayList<>();
 
     public void setPassword(String password) {
         this.password = password;

@@ -24,18 +24,12 @@ public class CustomUserDetailsService implements UserDetailsService {
 
     @Override
     public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
-        User user = userRepository.findByEmail(email);
-        if (user == null) {
-            throw new ResponseStatusException(HttpStatusCode.valueOf(401), "존재하지 않는 아이디입니다.");
-        }
+        User user = userRepository.findByEmail(email).orElseThrow(() -> new ResponseStatusException(HttpStatusCode.valueOf(401), "존재하지 않는 이메일입니다."));
         return new CustomUserDetails(user);
     }
 
     public UserDetails loadUserByUserId(int userId) throws UsernameNotFoundException {
-        User user = userRepository.findById(userId);
-        if (user == null) {
-            throw new ResponseStatusException(HttpStatusCode.valueOf(401), "존재하지 않는 아이디입니다.");
-        }
+        User user = userRepository.findById(userId).orElseThrow(() -> new ResponseStatusException(HttpStatusCode.valueOf(401), "존재하지 않는 유저id입니다."));
         return new CustomUserDetails(user);
     }
 

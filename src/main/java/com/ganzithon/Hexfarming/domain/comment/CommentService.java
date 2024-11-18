@@ -2,6 +2,7 @@ package com.ganzithon.Hexfarming.domain.comment;
 
 import com.ganzithon.Hexfarming.domain.comment.dto.fromClient.CommentRequestDto;
 import com.ganzithon.Hexfarming.domain.comment.dto.fromServer.CommentResponseDto;
+import com.ganzithon.Hexfarming.domain.notification.NotificationService;
 import com.ganzithon.Hexfarming.domain.user.User;
 import com.ganzithon.Hexfarming.domain.user.UserRepository;
 import com.ganzithon.Hexfarming.domain.post.Post;
@@ -19,12 +20,14 @@ import java.util.stream.Collectors;
 @Service
 public class CommentService {
 
+    private final NotificationService notificationService;
     private final CommentRepository commentRepository;
     private final PostRepository postRepository;
     private final UserRepository userRepository;
 
     @Autowired
-    public CommentService(CommentRepository commentRepository, PostRepository postRepository, UserRepository userRepository) {
+    public CommentService(NotificationService notificationService, CommentRepository commentRepository, PostRepository postRepository, UserRepository userRepository) {
+        this.notificationService = notificationService;
         this.commentRepository = commentRepository;
         this.postRepository = postRepository;
         this.userRepository = userRepository;
@@ -52,6 +55,8 @@ public class CommentService {
         comment.setWriter(user);
 
         commentRepository.save(comment);
+
+        notificationService.saveCheckFeedBack(post, user);
 
         // 게시글 점수 합계
         post.setScoreSum(post.getScoreSum() + validatedScore);
@@ -89,10 +94,7 @@ public class CommentService {
 
     // 유틸리티 메서드
     private User getUserByUsername(String username) {
-        User user = userRepository.findByEmail(username);
-        if (user == null) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "작성자를 찾을 수 없습니다.");
-        }
+        User user = userRepository.findByEmail(username).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "작성자를 찾을 수 없습니다."));
         return user;
     }
 

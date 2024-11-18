@@ -84,15 +84,27 @@ public class UserController {
     }
 
     @Tag(name = "유저")
-    @Operation(summary = "자신의 정보 조회", description = "현재 요청한 유저의 정보를 조회한다.\n\n(이메일과 닉네임만 불러온다)")
+    @Operation(summary = "자신의 정보 조회", description = "현재 요청한 유저의 정보를 조회한다.\n\n(이메일과 이름, 닉네임만 불러온다)")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "조회 성공", content = @Content(mediaType = "application/json", schema = @Schema(implementation = UserInformationServerDto.class))),
+            @ApiResponse(responseCode = "401", description = "잘못된 유저가 요청할 경우", content = @Content(mediaType = "application/json"))
+    })
+    @CrossOrigin(origins = "*", methods = RequestMethod.POST)
+    @GetMapping("/myInformation")
+    public UserInformationServerDto myInformation() {
+        return userService.myInformation();
+    }
+
+    @Tag(name = "유저")
+    @Operation(summary = "특정 유저의 정보 조회", description = "특정 유저의 유저의 정보를 조회한다.\n\n(이메일과 이름, 닉네임만 불러온다)")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "조회 성공", content = @Content(mediaType = "application/json", schema = @Schema(implementation = UserInformationServerDto.class))),
             @ApiResponse(responseCode = "401", description = "잘못된 유저가 요청할 경우", content = @Content(mediaType = "application/json"))
     })
     @CrossOrigin(origins = "*", methods = RequestMethod.POST)
     @GetMapping("/userInformation")
-    public UserInformationServerDto userInformation() {
-        return userService.userInformation();
+    public UserInformationServerDto userInformation(@RequestBody UserInformationClientDto dto) {
+        return userService.userInformation(dto.userId());
     }
 
     @Tag(name = "유저")

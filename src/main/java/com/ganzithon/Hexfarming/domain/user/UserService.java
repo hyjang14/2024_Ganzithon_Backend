@@ -6,6 +6,7 @@ import com.ganzithon.Hexfarming.domain.user.dto.fromServer.CheckPasswordServerDt
 import com.ganzithon.Hexfarming.domain.user.dto.fromServer.ResponseTokenServerDto;
 import com.ganzithon.Hexfarming.domain.user.dto.fromServer.CheckDuplicateServerDto;
 import com.ganzithon.Hexfarming.domain.user.dto.fromServer.UserInformationServerDto;
+import com.ganzithon.Hexfarming.domain.user.util.UserConstants;
 import com.ganzithon.Hexfarming.domain.user.util.CustomUserDetails;
 import com.ganzithon.Hexfarming.domain.user.util.CustomUserDetailsService;
 import com.ganzithon.Hexfarming.domain.user.util.UserValidator;
@@ -18,7 +19,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-@Service // Service 클래스(로직을 처리)임을 알려줌
+@Service
 public class UserService {
     private final UserRepository userRepository;
     private final ExperienceService experienceService;
@@ -26,7 +27,7 @@ public class UserService {
     private final PasswordEncoderManager passwordEncoderManager;
     private final JwtManager jwtManager;
 
-    @Autowired // Bean으로 관리하고 있는 객체들을 자동으로 주입해줌
+    @Autowired
     public UserService(UserRepository userRepository, ExperienceService experienceService, CustomUserDetailsService customUserDetailsService, PasswordEncoderManager passwordEncoderManager, JwtManager jwtManager) {
         this.userRepository = userRepository;
         this.experienceService = experienceService;
@@ -35,24 +36,20 @@ public class UserService {
         this.jwtManager = jwtManager;
     }
 
-    @Transactional // DB에 접근한다는 것을 알리는 애너테이션
+    @Transactional
     public ResponseTokenServerDto signUp(SignUpClientDto dto) throws IllegalArgumentException {
-        // 패스워드의 길이를 검사
         UserValidator.validatePasswordLength(dto.password());
-
-        // 비밀번호 암호화(해싱)
         String hashedPassword = passwordEncoderManager.encode(dto.password());
 
-        // 새로운 유저를 생성하여 DB에 저장
         User newUser = User.builder()
                 .email(dto.email())
                 .password(hashedPassword)
+                .name(dto.name())
                 .nickname(dto.nickname())
                 .build();
         userRepository.save(newUser);
-        experienceService.initiateAbilityExperience(newUser); // 역량 별 경험치 0으로 초기화
+        experienceService.initiateAbilityExperience(newUser);
 
-        // Jwt 토큰 생성 후 발급
         String accessToken = jwtManager.createToken(newUser.getId(), false);
         String refreshToken = jwtManager.createToken(newUser.getId(), true);
 
@@ -64,20 +61,16 @@ public class UserService {
         String email = dto.email();
         String password = dto.password();
 
-        // 해당 email으로 등록된 유저가 있는지 확인하고 없으면 예외
-        User existUser = userRepository.findByEmail(email);
-        if (existUser == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "아이디 혹은 비밀번호가 잘못되었습니다.");
-        }
+        User existUser = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, UserConstants.INVALID_EMAIL_OR_PASSWORD));
 
-        // 패스워드가 일치하는지 확인 후 토큰 반환
         if (passwordEncoderManager.matches(password, existUser.getPassword())) {
             String accessToken = jwtManager.createToken(existUser.getId(), false);
             String refreshToken = jwtManager.createToken(existUser.getId(), true);
 
             return new ResponseTokenServerDto(accessToken, refreshToken);
         }
-        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "아이디 혹은 비밀번호가 잘못되었습니다.");
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, UserConstants.INVALID_EMAIL_OR_PASSWORD);
     }
 
     @Transactional(readOnly = true)
@@ -99,9 +92,15 @@ public class UserService {
     }
 
     @Transactional(readOnly = true)
-    public UserInformationServerDto userInformation() {
+    public UserInformationServerDto myInformation() {
         CustomUserDetails nowUser = customUserDetailsService.getCurrentUserDetails();
-        return new UserInformationServerDto(nowUser.getUsername(), nowUser.getNickname());
+        return userInformation(nowUser.getUser().getId());
+    }
+
+    @Transactional(readOnly = true)
+    public UserInformationServerDto userInformation(int userId) {
+        User theUser = userRepository.findById(userId).orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, UserConstants.USER_ID_NOT_FOUND));
+        return new UserInformationServerDto(theUser.getEmail(), theUser.getName(), theUser.getNickname());
     }
 
     @Transactional(readOnly = true)
@@ -114,7 +113,7 @@ public class UserService {
     @Transactional
     public void changePassword(ChangePasswordClientDto dto) {
         if (!UserValidator.validateRePasswordIsCorrect(dto.password(), dto.rePassword())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "비밀번호가 일치하지 않습니다.");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, UserConstants.INVALID_PASSWORD);
         }
         UserValidator.validatePasswordLength(dto.password());
 
