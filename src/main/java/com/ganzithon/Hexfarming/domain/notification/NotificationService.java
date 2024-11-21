@@ -3,6 +3,7 @@ package com.ganzithon.Hexfarming.domain.notification;
 import com.ganzithon.Hexfarming.domain.notification.dto.fromClient.DeleteNotificationClientDto;
 import com.ganzithon.Hexfarming.domain.notification.dto.fromServer.ResponseNotificationCountServerDto;
 import com.ganzithon.Hexfarming.domain.notification.dto.fromServer.ResponseNotificationServerDto;
+import com.ganzithon.Hexfarming.domain.notification.util.NotificationBuilder;
 import com.ganzithon.Hexfarming.domain.post.Post;
 import com.ganzithon.Hexfarming.domain.user.User;
 import com.ganzithon.Hexfarming.domain.user.UserService;
@@ -62,23 +63,15 @@ public class NotificationService {
 
     @Transactional
     public void saveCheckPoints(Post post) {
-        Notification newNotification = Notification.builder()
-                .post(post)
-                .user(post.getWriter())
-                .isCheckPoints(true)
-                .message(String.format(checkPointMessage, post.getTitle()))
-                .build();
+        Notification newNotification = NotificationBuilder.build(post, post.getWriter(),
+                true, String.format(checkPointMessage, post.getTitle()));
         notificationRepository.save(newNotification);
     }
 
     @Transactional
     public void saveCheckFeedBack(Post post, User user) {
-        Notification newNotification = Notification.builder()
-                .post(post)
-                .user(post.getWriter())
-                .isCheckPoints(false)
-                .message(String.format(checkFeedback, post.getTitle(), user.getNickname()))
-                .build();
+        Notification newNotification = NotificationBuilder.build(post, post.getWriter(),
+                false, String.format(checkFeedback, post.getTitle(), user.getNickname()));
         notificationRepository.save(newNotification);
     }
 }

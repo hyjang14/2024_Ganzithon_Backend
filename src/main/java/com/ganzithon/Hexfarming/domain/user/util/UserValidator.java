@@ -1,5 +1,6 @@
 package com.ganzithon.Hexfarming.domain.user.util;
 
+import com.ganzithon.Hexfarming.global.enumeration.ExceptionMessage;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -16,7 +17,7 @@ public class UserValidator {
 
     public static void validatePasswordLength(String password) {
         if (password.length() < MIN_PASSWORD_LENGTH || password.length() > MAX_PASSWORD_LENGTH) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "비밀번호는 8자 이상, 16자 이하여야 합니다.");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, ExceptionMessage.INVALID_PASSWORD_LENGTH.getMessage());
         }
     }
 }

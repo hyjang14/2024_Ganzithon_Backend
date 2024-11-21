@@ -24,12 +24,12 @@ public enum Ability {
         this.description = description;
     }
 
-    public static Ability fromId(int id) { // 역량 id로부터 Ability Enum 값을 찾아서 반환
+    public static Ability fromId(int id) {
         for (Ability ability : Ability.values()) {
             if (ability.getId() == id) {
                 return ability;
             }
         }
-        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "잘못된 역량 id입니다.");
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, ExceptionMessage.INVALID_ABILITY_ID.getMessage());
     }
 }

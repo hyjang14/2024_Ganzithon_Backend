@@ -13,4 +13,6 @@ public class GlobalConstants {
             "/experience/getAbilityList",
             "/experience/getTierList",
     };
+
+    public static String S3URL = "https://hexfarming.s3.ap-northeast-2.amazonaws.com/";
 }

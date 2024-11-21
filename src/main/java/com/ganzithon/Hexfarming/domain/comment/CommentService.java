@@ -1,7 +1,9 @@
 package com.ganzithon.Hexfarming.domain.comment;
 
 import com.ganzithon.Hexfarming.domain.comment.dto.fromClient.CommentRequestDto;
+import com.ganzithon.Hexfarming.domain.comment.dto.fromClient.SelectCommentClientDto;
 import com.ganzithon.Hexfarming.domain.comment.dto.fromServer.CommentResponseDto;
+import com.ganzithon.Hexfarming.domain.experience.ExperienceService;
 import com.ganzithon.Hexfarming.domain.notification.NotificationService;
 import com.ganzithon.Hexfarming.domain.user.User;
 import com.ganzithon.Hexfarming.domain.user.UserRepository;
@@ -21,13 +23,15 @@ import java.util.stream.Collectors;
 public class CommentService {
 
     private final NotificationService notificationService;
+    private final ExperienceService experienceService;
     private final CommentRepository commentRepository;
     private final PostRepository postRepository;
     private final UserRepository userRepository;
 
     @Autowired
-    public CommentService(NotificationService notificationService, CommentRepository commentRepository, PostRepository postRepository, UserRepository userRepository) {
+    public CommentService(NotificationService notificationService, ExperienceService experienceService, CommentRepository commentRepository, PostRepository postRepository, UserRepository userRepository) {
         this.notificationService = notificationService;
+        this.experienceService = experienceService;
         this.commentRepository = commentRepository;
         this.postRepository = postRepository;
         this.userRepository = userRepository;
@@ -150,7 +154,7 @@ public class CommentService {
 
     // 댓글 채택
     @Transactional
-    public CommentResponseDto selectComment(Long postId, Long commentId, String username) {
+    public CommentResponseDto selectComment(SelectCommentClientDto dto, Long postId, Long commentId, String username) {
         Post post = getPostById(postId);
 
         // 작성자가 맞는지 확인
@@ -174,6 +178,9 @@ public class CommentService {
         // 댓글 채택
         comment.setSelected(true);
         commentRepository.save(comment);
+
+        // 채택된 댓글 작성자에게 점수 부여
+        experienceService.inceaseExperience(comment.getWriter().getId(), post.getAbility(), dto.point());
 
         return mapToDto(comment);
     }

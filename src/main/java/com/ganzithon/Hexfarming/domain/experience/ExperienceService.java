@@ -7,6 +7,7 @@ import com.ganzithon.Hexfarming.domain.experience.util.ExperienceCreator;
 import com.ganzithon.Hexfarming.domain.user.User;
 import com.ganzithon.Hexfarming.domain.user.util.CustomUserDetailsService;
 import com.ganzithon.Hexfarming.global.enumeration.Ability;
+import com.ganzithon.Hexfarming.global.enumeration.ExceptionMessage;
 import com.ganzithon.Hexfarming.global.enumeration.Tier;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -59,7 +60,7 @@ public class ExperienceService {
     @Transactional(readOnly = true)
     public List<ExperienceServerDto> getExperiences(int userId) {
         List<Experience> experiences = experienceRepository.findAllByUserId(userId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "존재하지 않는 유저id입니다."));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, ExceptionMessage.INVALID_USER_ID.getMessage()));
 
         return experiences.stream()
                 .map(ExperienceServerDto::from)
@@ -75,7 +76,7 @@ public class ExperienceService {
     @Transactional(readOnly = true)
     public ExperienceServerDto getAbilityExperiences(Ability ability, int userId) {
         Experience experience = experienceRepository.findByUserIdAndAbility(userId, ability)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "잘못된 요청입니다."));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, ExceptionMessage.INVALID_REQUEST.getMessage()));
 
         return ExperienceServerDto.from(experience);
     }

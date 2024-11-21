@@ -22,7 +22,7 @@ import java.util.Map;
 
 @Component
 public class JwtManager {
-    @Value("${jwt.accessExpiration}") // application.properties에 작성한 jwt.accessExpiration 값을 가져옴
+    @Value("${jwt.accessExpiration}")
     private long accessExpiration;
     @Value("${jwt.refreshExpiration}")
     private long refreshExpiration;
@@ -33,13 +33,13 @@ public class JwtManager {
         Map<String, Integer> claim = createClaim(userId);
 
         Date now = new Date();
-        Date expireTime = new Date(now.getTime() + accessExpiration); // 액세스 토큰의 만료 시간
+        Date expireTime = new Date(now.getTime() + accessExpiration);
         if (isRefresh) {
-            expireTime = new Date(now.getTime() + refreshExpiration); // 리프레시 토큰의 만료 시간
+            expireTime = new Date(now.getTime() + refreshExpiration);
         }
 
         Key key = getSignKey();
-        String token = Jwts.builder() // Jwt 토큰을 생성
+        String token = Jwts.builder()
                 .setClaims(claim)
                 .setIssuedAt(now)
                 .setExpiration(expireTime)
@@ -55,15 +55,15 @@ public class JwtManager {
         return claim;
     }
 
-    public Key getSignKey() { // 토큰 생성에 사용할 키를 Key 객체로 만듦
-        byte[] keyBytes = secretKey.getBytes(StandardCharsets.UTF_8); // 암호화 키를 바이트 배열로 분해
-        return Keys.hmacShaKeyFor(keyBytes); // HMAC-SHA512 알고리즘에 사용할 키 생성
+    public Key getSignKey() {
+        byte[] keyBytes = secretKey.getBytes(StandardCharsets.UTF_8);
+        return Keys.hmacShaKeyFor(keyBytes);
     }
 
     public int validateToken(String token) {
         try {
             JwtParser jwtParser = getJwtParser();
-            return (int) jwtParser.parseSignedClaims(token).getPayload().get("userId"); // 토큰 검증 후 userId 반환
+            return (int) jwtParser.parseSignedClaims(token).getPayload().get("userId");
         } catch (MalformedJwtException exception) {
             throw new ResponseStatusException(HttpStatus.valueOf(401), exception.getMessage());
         }

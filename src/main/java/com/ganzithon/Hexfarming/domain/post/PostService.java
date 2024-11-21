@@ -3,13 +3,20 @@ package com.ganzithon.Hexfarming.domain.post;
 import com.ganzithon.Hexfarming.domain.comment.Comment;
 import com.ganzithon.Hexfarming.domain.experience.ExperienceService;
 import com.ganzithon.Hexfarming.domain.notification.NotificationService;
+import com.ganzithon.Hexfarming.domain.post.dto.fromClient.DeletePictureClientDto;
 import com.ganzithon.Hexfarming.domain.post.dto.fromClient.PostRequestDto;
 import com.ganzithon.Hexfarming.domain.post.dto.fromClient.PostUpdateRequestDto;
+import com.ganzithon.Hexfarming.domain.post.dto.fromServer.MyPostCountServerDto;
+import com.ganzithon.Hexfarming.domain.post.dto.fromServer.PictureUrlServerDto;
 import com.ganzithon.Hexfarming.domain.post.dto.fromServer.PostResponseDto;
+import com.ganzithon.Hexfarming.domain.post.dto.fromServer.PostTitleServerDto;
 import com.ganzithon.Hexfarming.domain.user.User;
 import com.ganzithon.Hexfarming.domain.user.UserRepository;
+import com.ganzithon.Hexfarming.domain.user.util.CustomUserDetails;
+import com.ganzithon.Hexfarming.global.GlobalConstants;
 import com.ganzithon.Hexfarming.global.enumeration.Ability;
-import com.ganzithon.Hexfarming.global.utility.JwtManager;
+import com.ganzithon.Hexfarming.global.enumeration.ExceptionMessage;
+import com.ganzithon.Hexfarming.global.utility.S3Manager;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -19,13 +26,16 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 import com.ganzithon.Hexfarming.domain.comment.CommentRepository;
+
+import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -36,17 +46,17 @@ public class PostService {
     private final PostRepository postRepository;
     private final UserRepository userRepository;
     private final CommentRepository commentRepository;
-    private final JwtManager jwtManager; // JWT 토큰 처리 클래스
+    private final S3Manager s3Manager;
 
     @Autowired
     public PostService(ExperienceService experienceService, NotificationService notificationService, PostRepository postRepository,
-                       UserRepository userRepository, JwtManager jwtManager, CommentRepository commentRepository) {
+                       UserRepository userRepository, CommentRepository commentRepository, S3Manager s3Manager) {
         this.experienceService = experienceService;
         this.notificationService = notificationService;
         this.postRepository = postRepository;
         this.userRepository = userRepository;
-        this.jwtManager = jwtManager;
         this.commentRepository = commentRepository;
+        this.s3Manager = s3Manager;
     }
 
 
@@ -176,6 +186,7 @@ public class PostService {
                         int writerId = post.getWriter().getId();
                         experienceService.inceaseExperience(writerId, post.getAbility(), getAverageScoreByPostId(post.getPostId()));
                         post.setTimerOver(true);
+                        postRepository.save(post);
                         notificationService.saveCheckPoints(post);
                     });
         }
@@ -212,9 +223,9 @@ public class PostService {
 
     @Transactional(readOnly = true)
     public List<PostResponseDto> searchPost(String titleContains, Ability ability) {
-        Optional<List<Post>> postsOptional = postRepository.findByTitleContaining(titleContains);
+        Optional<List<Post>> postsOptional = postRepository.findAllByTitleContaining(titleContains);
         if (ability != null) {
-            postsOptional = postRepository.findByTitleContainingAndAbility(titleContains, ability);
+            postsOptional = postRepository.findAllByTitleContainingAndAbility(titleContains, ability);
         }
 
         if (postsOptional.isEmpty() || postsOptional.get().isEmpty()) {
@@ -266,4 +277,77 @@ public class PostService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
+    public List<PostTitleServerDto> getLatestPosts() {
+        List<PostTitleServerDto> latestPosts = new ArrayList<>();
+        for(Ability ability : Ability.values()) {
+            Optional<Post> postsOptional = postRepository.findFirstByAbilityOrderByCreatedAtDesc(ability);
+            if (postsOptional.isEmpty()) {
+                latestPosts.add(new PostTitleServerDto(-1, ability, null));
+                continue;
+            }
+            Post post = postsOptional.get();
+            latestPosts.add(new PostTitleServerDto(post.getPostId(), post.getAbility(), post.getTitle()));
+        }
+        return latestPosts;
+    }
+
+    @Transactional(readOnly = true)
+    public MyPostCountServerDto getMyPostsCount() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "사용자가 인증되지 않았습니다.");
+        }
+
+        // 너무 하드코딩인데............ 리팩토링마렵다
+        CustomUserDetails nowUserDetails = (CustomUserDetails) authentication.getPrincipal();
+        int nowUserId = nowUserDetails.getUser().getId();
+        int totalCount = postRepository.countByWriterId(nowUserId);
+        int leadershipCount = postRepository.countByWriterIdAndAbility(nowUserId, Ability.LEADERSHIP);
+        int creativityCount = postRepository.countByWriterIdAndAbility(nowUserId, Ability.CREATIVITY);
+        int communicationCount = postRepository.countByWriterIdAndAbility(nowUserId, Ability.COMMUNICATION_SKILL);
+        int diligenceCount = postRepository.countByWriterIdAndAbility(nowUserId, Ability.DILIGENCE);
+        int resilienceCount = postRepository.countByWriterIdAndAbility(nowUserId, Ability.RESILIENCE);
+        int tenacityCount = postRepository.countByWriterIdAndAbility(nowUserId, Ability.TENACITY);
+        return new MyPostCountServerDto(totalCount, leadershipCount, creativityCount, communicationCount,
+                diligenceCount, resilienceCount, tenacityCount);
+    }
+
+    @Transactional(readOnly = true)
+    public List<PostResponseDto> getMyPostsByAbility(Ability ability) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "사용자가 인증되지 않았습니다.");
+        }
+        CustomUserDetails nowUserDetails = (CustomUserDetails) authentication.getPrincipal();
+        int nowUserId = nowUserDetails.getUser().getId();
+
+        Optional<List<Post>> postsOptional = postRepository.findAllByWriterIdAndAbility(nowUserId, ability);
+        if (postsOptional.isEmpty() || postsOptional.get().isEmpty()) {
+            return Collections.emptyList();
+        }
+        return postsOptional.get().stream()
+                .map(PostResponseDto::fromEntity)
+                .collect(Collectors.toList());
+    }
+
+    public PictureUrlServerDto uploadPicture(MultipartFile multipartFile) {
+        if (multipartFile == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, ExceptionMessage.CANNOT_UPLOAD_FILE.getMessage());
+        }
+        try {
+            String uploadedUrl = s3Manager.upload(multipartFile, "images");
+            return new PictureUrlServerDto(uploadedUrl);
+        } catch (IOException exception) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, ExceptionMessage.CANNOT_UPLOAD_FILE.getMessage());
+        }
+    }
+
+    public void deletePicture(DeletePictureClientDto dto) {
+        try {
+            s3Manager.delete(dto.pictureUrl().replace(GlobalConstants.S3URL, ""));
+        } catch (Exception exception) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, ExceptionMessage.CANNOT_DELETE_FILE.getMessage());
+        }
+    }
 }

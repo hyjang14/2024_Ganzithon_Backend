@@ -1,6 +1,7 @@
 package com.ganzithon.Hexfarming.domain.comment;
 
 import com.ganzithon.Hexfarming.domain.comment.dto.fromClient.CommentRequestDto;
+import com.ganzithon.Hexfarming.domain.comment.dto.fromClient.SelectCommentClientDto;
 import com.ganzithon.Hexfarming.domain.comment.dto.fromServer.CommentResponseDto;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -102,7 +103,8 @@ public class CommentController {
     @PostMapping("/{postId}/{commentId}/accept")
     public ResponseEntity<CommentResponseDto> selectComment(
             @PathVariable Long postId,
-            @PathVariable Long commentId
+            @PathVariable Long commentId,
+            @RequestBody SelectCommentClientDto dto
     ) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !authentication.isAuthenticated()) {
@@ -111,7 +113,7 @@ public class CommentController {
 
         String username = authentication.getName();
 
-        CommentResponseDto selectedComment = commentService.selectComment(postId, commentId, username);
+        CommentResponseDto selectedComment = commentService.selectComment(dto, postId, commentId, username);
 
         return ResponseEntity.ok(selectedComment);
     }

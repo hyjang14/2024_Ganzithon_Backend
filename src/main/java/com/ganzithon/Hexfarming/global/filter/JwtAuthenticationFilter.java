@@ -2,6 +2,7 @@ package com.ganzithon.Hexfarming.global.filter;
 
 import com.ganzithon.Hexfarming.domain.user.util.CustomUserDetails;
 import com.ganzithon.Hexfarming.domain.user.util.CustomUserDetailsService;
+import com.ganzithon.Hexfarming.global.enumeration.ExceptionMessage;
 import com.ganzithon.Hexfarming.global.utility.JwtManager;
 import com.ganzithon.Hexfarming.global.utility.NoTokenNeededEndpointParser;
 import jakarta.servlet.FilterChain;
@@ -31,13 +32,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
-        String rawBearerToken = request.getHeader("Authorization"); // Authorization 헤더의 값을 가져옴
+        String rawBearerToken = request.getHeader("Authorization");
         if (rawBearerToken == null || !rawBearerToken.startsWith("Bearer ")) {
-            throw new ResponseStatusException(HttpStatus.valueOf(401), "유효하지 않은 토큰입니다.");
+            throw new ResponseStatusException(HttpStatus.valueOf(401), ExceptionMessage.INVALID_TOKEN.getMessage());
         }
-        String accessToken = rawBearerToken.substring(7); // 액세스 토큰 추출
+        String accessToken = rawBearerToken.substring(7);
 
-        int userId = jwtManager.validateToken(accessToken); // 토큰으로부터 userId를 받아옴
+        int userId = jwtManager.validateToken(accessToken);
         CustomUserDetails customUserDetails = (CustomUserDetails) customUserDetailsService.loadUserByUserId(userId);
         Authentication authentication =jwtManager.getAuthentication(customUserDetails);
         SecurityContextHolder.getContext().setAuthentication(authentication);
@@ -47,7 +48,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) throws ServletException {
-        // Jwt 필터를 적용하지 않을 Endpoint를 작성
         String path = request.getRequestURI();
         return NoTokenNeededEndpointParser.parsePath(path);
     }
